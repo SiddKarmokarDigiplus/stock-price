@@ -8,20 +8,21 @@ import sys
 import socket
 from datetime import datetime
 
-def check_port(port):
-    """Check if a port is available"""
+def check_port(port, host='0.0.0.0'):
+    """Check if a port is available on the specified host interface."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.bind(('localhost', port))
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host, port))
             return True
         except OSError:
             return False
 
-def find_free_port(start_port=5000):
-    """Find a free port starting from start_port"""
+def find_free_port(start_port=5000, host='0.0.0.0'):
+    """Find a free port starting from start_port on specified host."""
     port = start_port
     while port < start_port + 100:
-        if check_port(port):
+        if check_port(port, host=host):
             return port
         port += 1
     raise RuntimeError("Could not find a free port")
@@ -75,14 +76,15 @@ def main():
         print("Make sure virtual environment is activated!")
         sys.exit(1)
     
-    # Check port availability
+    # Determine host and port availability
+    host = os.getenv('HOST', '0.0.0.0')
     port = int(os.getenv('PORT', 5000))
-    if not check_port(port):
-        print(f"⚠️  Port {port} is busy, finding free port...")
-        port = find_free_port(port)
+    if not check_port(port, host=host):
+        print(f"⚠️  Port {port} on {host} is busy, finding free port...")
+        port = find_free_port(port, host=host)
         print(f"✓ Using port {port}")
     else:
-        print(f"✓ Port {port} is available")
+        print(f"✓ Port {port} on {host} is available")
     
     # Set environment variables
     os.environ['PORT'] = str(port)
@@ -98,7 +100,7 @@ def main():
     try:
         # Import and run the Flask app
         from main import app
-        app.run(host='0.0.0.0', port=port, debug=False)
+        app.run(host=host, port=port, debug=False)
     except KeyboardInterrupt:
         print("\n👋 Server stopped by user")
     except Exception as e:
